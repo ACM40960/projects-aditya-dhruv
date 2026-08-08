@@ -1,0 +1,71 @@
+=================================================================
+FULL PROJECT METRICS SUMMARY
+=================================================================
+
+--- Dataset ---
+Source:          Official FPL API + vaastav GitHub historical data
+Seasons:         2016/17 to 2023/24 (8 seasons)
+Raw records:     5,713 player-season records
+After lag drop:  2,216 records (players with 2+ seasons history)
+Features:        34 (lag features, per-90 metrics, price, position)
+Train seasons:   2018/19 to 2022/23 (1,795 records)
+Test season:     2023/24 (421 records)
+
+--- Leakage Fix ---
+Removed:         end_price (target season end price — not known before season)
+Replaced with:   start_price (pre-season price — known before season starts)
+Added:           end_price_lag1 (previous season end price — valid feature)
+
+--- Cross-Validation ---
+Method:          Season-grouped expanding-window
+Folds:           Train on seasons before val season, validate on next season
+Test season:     2023/24 kept completely separate throughout
+
+--- Expanding-Window CV R2 (Ridge) ---
+Folds: [0.213, 0.31]
+Mean:  0.262 (+/- 0.049)
+
+--- Expanding-Window CV R2 (XGBoost) ---
+Folds: [0.218, 0.243]
+Mean:  0.230 (+/- 0.012)
+
+--- Model Performance on Test Season (2023/24) ---
+                     Model    R2   MAE  RMSE
+Baseline (prev season pts) 0.207 31.74 47.02
+          Ridge Regression 0.377 30.64 41.68
+                   XGBoost 0.320 32.15 43.55
+            Neural Network 0.341 31.42 42.86
+        Ensemble: XGB + NN 0.347 31.57 42.66
+     Ensemble: Ridge + XGB 0.361 31.09 42.21
+Ensemble: Ridge + XGB + NN 0.364 31.04 42.10
+
+--- Best Model: Ridge Regression ---
+R2:   0.377
+MAE:  30.64 points
+RMSE: 41.68 points
+Alpha (RidgeCV selected): 100.0
+
+--- Squad Optimisation (ILP) ---
+Method:      Integer Linear Programming (PuLP, CBC solver)
+Budget:      £100m
+Constraints: 2 GKP, 5 DEF, 5 MID, 3 FWD, max 3 per club
+Pred source: Ridge Regression (best leakage-free model)
+
+--- Squad Comparison (2023/24 season) ---
+ML+ILP aggregate actual season points:   1895
+Baseline aggregate actual season points: 1613
+Absolute improvement:                    +282 points
+Percentage improvement:                  +17.5%
+
+Definition: Aggregate actual season points = sum of 2023/24 actual
+FPL points across all 15 ILP-selected players. Starting XI,
+captaincy, substitutions and transfers are not simulated.
+
+--- Limitations ---
+1. Season-level prediction only (not gameweek-level)
+2. No injury/suspension/team-news data included
+3. Gameweek-level data would provide a larger dataset and allow
+   future work to test whether nonlinear models offer additional
+   predictive value over Ridge Regression
+4. Squad result reflects aggregate points, not a simulated FPL score
+=================================================================

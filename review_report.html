@@ -1,0 +1,208 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FPL Project Review</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; background: #f5f5f5; color: #222; }
+  h1 { background: #2d5a27; color: white; padding: 20px; border-radius: 8px; }
+  h2 { color: #2d5a27; border-bottom: 2px solid #2d5a27; padding-bottom: 6px; margin-top: 40px; }
+  h3 { color: #444; margin-top: 25px; }
+  p { line-height: 1.7; }
+  img { width: 100%; border: 1px solid #ccc; border-radius: 6px; margin: 15px 0; }
+  .caption { font-size: 0.85em; color: #666; text-align: center; margin-top: -10px; margin-bottom: 20px; }
+  table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+  th { background: #2d5a27; color: white; padding: 10px; }
+  td { padding: 10px; border: 1px solid #ccc; text-align: center; }
+  tr:nth-child(even) { background: #f0f0f0; }
+  .highlight { background: #e8f5e9; border-left: 4px solid #2d5a27; padding: 15px; margin: 20px 0; border-radius: 4px; }
+  .section { background: white; padding: 25px; border-radius: 8px; margin-bottom: 25px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+</style>
+</head>
+<body>
+
+<h1>FPL AI Project — Review Report<br><small style="font-size:0.6em">Fantasy Premier League Team Optimisation Using ML and Linear Programming</small></h1>
+
+<div class="section">
+<h2>1. What Are We Building?</h2>
+<p>An AI system that looks at 5 years of Fantasy Premier League player data and answers two questions:</p>
+<ol>
+  <li><strong>Prediction:</strong> How many FPL points will each player score next season?</li>
+  <li><strong>Selection:</strong> Given those predictions, which 15 players should I pick within a £100m budget?</li>
+</ol>
+<div class="highlight">
+  <strong>Think of it like this:</strong> Instead of manually guessing which players to pick, the AI analyses historical patterns and automatically picks the best possible squad.
+</div>
+</div>
+
+<div class="section">
+<h2>2. Data</h2>
+<p>All data was fetched from the official FPL API. We collected 5 seasons of data (2021/22 to 2025/26) covering ~700 players per season.</p>
+
+<table>
+  <tr><th>Stat</th><th>Value</th></tr>
+  <tr><td>Seasons covered</td><td>2021/22 to 2025/26</td></tr>
+  <tr><td>Raw player-season records</td><td>2,017</td></tr>
+  <tr><td>After feature engineering</td><td>1,519</td></tr>
+  <tr><td>After dropping NaN lags</td><td>900 (used for modelling)</td></tr>
+  <tr><td>Training set (seasons 2021-2025)</td><td>611 records</td></tr>
+  <tr><td>Test set (season 2025/26)</td><td>289 records</td></tr>
+</table>
+</div>
+
+<div class="section">
+<h2>3. Exploratory Data Analysis</h2>
+
+<h3>3.1 Points Distribution by Position</h3>
+<p>Midfielders and forwards score the most points on average. Goalkeepers are the most consistent (less variance). Defenders vary widely depending on clean sheets.</p>
+<img src="data/processed/points_by_position.png" alt="Points by Position">
+<div class="caption">Figure 1: Total points distribution by position across all seasons</div>
+
+<h3>3.2 Top 15 Players by Average Season Points</h3>
+<p>Players like Haaland, Salah, and Fernandes consistently top the charts — our model should correctly identify these as high-value picks.</p>
+<img src="data/processed/top_players.png" alt="Top Players">
+<div class="caption">Figure 2: Top 15 players by average total points across seasons</div>
+
+<h3>3.3 Points Trend Across Seasons</h3>
+<p>Average points per position have been relatively stable across seasons, with midfielders slightly increasing in recent seasons.</p>
+<img src="data/processed/points_trend.png" alt="Points Trend">
+<div class="caption">Figure 3: Average points per season by position</div>
+
+<h3>3.4 Price vs Points</h3>
+<p>Higher priced players tend to score more points, but there are clear bargains — cheap players who punch above their weight. Our optimiser exploits this.</p>
+<img src="data/processed/price_vs_points.png" alt="Price vs Points">
+<div class="caption">Figure 4: Player price vs total points coloured by position</div>
+
+<h3>3.5 Feature Correlation Heatmap</h3>
+<p>Minutes played and bonus points are most strongly correlated with total points. Goals and assists matter more for outfield players.</p>
+<img src="data/processed/correlation_heatmap.png" alt="Correlation Heatmap">
+<div class="caption">Figure 5: Pearson correlation matrix of key features</div>
+</div>
+
+<div class="section">
+<h2>4. Feature Engineering</h2>
+<p>We created 24 features from the raw data. The most important ones are:</p>
+
+<table>
+  <tr><th>Feature</th><th>What it means</th></tr>
+  <tr><td>total_points_lag1</td><td>Points scored last season</td></tr>
+  <tr><td>total_points_lag2</td><td>Points scored two seasons ago</td></tr>
+  <tr><td>minutes_lag1</td><td>Minutes played last season</td></tr>
+  <tr><td>points_per_90_lag1</td><td>Points per 90 mins last season</td></tr>
+  <tr><td>xg_per_90_lag1</td><td>Expected goals per 90 last season</td></tr>
+  <tr><td>xa_per_90_lag1</td><td>Expected assists per 90 last season</td></tr>
+  <tr><td>end_price</td><td>Player price at end of season</td></tr>
+  <tr><td>pos_GKP/DEF/MID/FWD</td><td>Position indicator</td></tr>
+</table>
+
+<h3>Feature Correlation with Target (Total Points)</h3>
+<p>Previous season points (lag1) is by far the strongest predictor — if you scored well last season, you are likely to score well again.</p>
+<img src="data/processed/feature_correlation.png" alt="Feature Correlation">
+<div class="caption">Figure 6: Pearson correlation of each feature with total points target</div>
+</div>
+
+<div class="section">
+<h2>5. Models</h2>
+
+<h3>5.1 XGBoost</h3>
+<p>XGBoost is a powerful gradient boosting algorithm that builds many decision trees sequentially, each correcting the errors of the previous one. It works very well on structured tabular data like ours.</p>
+
+<img src="data/processed/xgb_actual_vs_predicted.png" alt="XGBoost Predictions">
+<div class="caption">Figure 7: XGBoost — Actual vs Predicted points. Points on the red line = perfect prediction.</div>
+
+<h3>5.2 SHAP Feature Importance</h3>
+<p>SHAP tells us which features matter most for each prediction. Previous season points (lag1) dominates — as expected. Minutes played and price are also important.</p>
+<img src="data/processed/shap_summary.png" alt="SHAP">
+<div class="caption">Figure 8: SHAP summary plot — features ranked by importance. Red = high value, Blue = low value.</div>
+
+<h3>5.3 Neural Network</h3>
+<p>We also trained a Multi-Layer Perceptron (MLP) with 3 hidden layers, batch normalisation, and dropout to prevent overfitting. Features were standardised before training.</p>
+
+<img src="data/processed/nn_training_history.png" alt="NN Training">
+<div class="caption">Figure 9: Neural Network training history — loss and MAE over epochs</div>
+
+<img src="data/processed/nn_actual_vs_predicted.png" alt="NN Predictions">
+<div class="caption">Figure 10: Neural Network — Actual vs Predicted points</div>
+</div>
+
+<div class="section">
+<h2>6. Model Comparison</h2>
+
+<table>
+  <tr><th>Model</th><th>R²</th><th>MAE (pts)</th><th>RMSE (pts)</th></tr>
+  <tr><td>XGBoost</td><td>0.300</td><td>35.50</td><td>45.05</td></tr>
+  <tr><td>Neural Network</td><td>0.305</td><td>36.53</td><td>44.89</td></tr>
+</table>
+
+<div class="highlight">
+  <strong>In simple terms:</strong> Both models are roughly equally good. On average we predict a player's season points within about 35-36 points. Given players score between 0 and 250 points in a season, this is a reasonable result.
+</div>
+
+<img src="data/processed/model_comparison.png" alt="Model Comparison">
+<div class="caption">Figure 11: XGBoost vs Neural Network — R², MAE and RMSE comparison</div>
+
+<h3>Error Analysis by Position</h3>
+<p>Forwards have the highest error — goal scoring is unpredictable. Goalkeepers are most accurately predicted — their points depend on stable metrics like clean sheets.</p>
+<img src="data/processed/error_analysis.png" alt="Error Analysis">
+<div class="caption">Figure 12: Absolute error by position for both models</div>
+
+<img src="data/processed/mae_by_position.png" alt="MAE by Position">
+<div class="caption">Figure 13: Mean absolute error by position</div>
+
+<img src="data/processed/residual_plots.png" alt="Residual Plots">
+<div class="caption">Figure 14: Residual plots — errors should be randomly scattered around zero</div>
+</div>
+
+<div class="section">
+<h2>7. Squad Optimisation</h2>
+<p>We averaged XGBoost and Neural Network predictions to get an ensemble score, then used Integer Linear Programming to pick the best 15 players within £100m.</p>
+
+<table>
+  <tr><th>Constraint</th><th>Value</th></tr>
+  <tr><td>Total budget</td><td>£100m</td></tr>
+  <tr><td>Goalkeepers</td><td>2</td></tr>
+  <tr><td>Defenders</td><td>5</td></tr>
+  <tr><td>Midfielders</td><td>5</td></tr>
+  <tr><td>Forwards</td><td>3</td></tr>
+  <tr><td>Max per club</td><td>3</td></tr>
+</table>
+
+<img src="data/processed/optimal_squad.png" alt="Optimal Squad">
+<div class="caption">Figure 15: Optimal 15-player squad selected by the ILP optimiser</div>
+
+<div class="highlight">
+  <strong>Results:</strong><br>
+  Total squad cost: £100.0m (exactly on budget)<br>
+  Total predicted points: 2,102.9<br>
+  Total actual points scored: 2,142.0<br>
+  Notable picks: Haaland (239 actual pts), Fernandes (235 pts), Semenyo (202 pts)
+</div>
+</div>
+
+<div class="section">
+<h2>8. Summary</h2>
+<p>The pipeline works end to end:</p>
+<ol>
+  <li>✅ Data fetched from FPL API — 5 seasons, 700+ players</li>
+  <li>✅ 24 features engineered including lag features and xG metrics</li>
+  <li>✅ XGBoost trained — R²=0.300, MAE=35.5 pts</li>
+  <li>✅ Neural Network trained — R²=0.305, MAE=36.5 pts</li>
+  <li>✅ Ensemble predictions computed</li>
+  <li>✅ ILP optimiser selects valid £100m squad</li>
+  <li>✅ Optimal squad correctly identifies top performers</li>
+</ol>
+
+<h3>Why R² is 0.30 and not higher</h3>
+<p>Football is inherently unpredictable. Players get injured, managers change tactics, and form fluctuates week to week. An R² of 0.30 is consistent with published results in sports prediction literature. The key strength of our system is not perfect prediction — it is systematic, data-driven selection that outperforms random guessing.</p>
+
+<h3>Future Improvements</h3>
+<ul>
+  <li>Gameweek-level prediction with fixture difficulty ratings</li>
+  <li>Multi-gameweek transfer planning with reinforcement learning</li>
+  <li>Real-time injury and team news integration</li>
+  <li>Understat xG data for richer feature engineering</li>
+</ul>
+</div>
+
+</body>
+</html>
