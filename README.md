@@ -179,3 +179,4 @@ See requirements.txt for full list.
 - **Dhruv Mehta** (25219708) — neural network architecture, helper modules, documentation
 
 ACM 40960 | University College Dublin | Summer 2026
+
